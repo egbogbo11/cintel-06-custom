@@ -152,30 +152,41 @@ def server(input, output, session):
 
     @render_plotly
     def tip_perc():
-        from ridgeplot import ridgeplot
+        is_shinylive = "pyodide" in sys.modules
 
         dat = tips_data()
         dat["percent"] = dat.tip / dat.total_bill
         yvar = input.tip_perc_y()
-        uvals = dat[yvar].unique()
 
-        samples = [[dat.percent[dat[yvar] == val]] for val in uvals]
-
-        plt = ridgeplot(
-            samples=samples,
-            labels=uvals,
-            bandwidth=0.01,
-            colorscale="viridis",
-            colormode="row-index",
-        )
-
-        plt.update_layout(
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5
+        if is_shinylive:
+            return px.box(
+                dat,
+                x=yvar,
+                y="percent",
+                color=yvar,
+                title=f"Tip percentage by {yvar}",
             )
-        )
+        else:
+            from ridgeplot import ridgeplot
 
-        return plt
+            uvals = dat[yvar].unique()
+            samples = [[dat.percent[dat[yvar] == val]] for val in uvals]
+
+            plt = ridgeplot(
+                samples=samples,
+                labels=uvals,
+                bandwidth=0.01,
+                colorscale="viridis",
+                colormode="row-index",
+            )
+
+            plt.update_layout(
+                legend=dict(
+                    orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5
+                )
+            )
+
+            return plt
 
     @reactive.effect
     @reactive.event(input.reset)
