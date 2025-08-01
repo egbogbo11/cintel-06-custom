@@ -1,8 +1,7 @@
 import faicons as fa
 import plotly.express as px
-import sys
+import os
 
-# Load data and compute static values
 from shared import app_dir, tips
 from shiny import App, reactive, render, ui
 from shinywidgets import output_widget, render_plotly
@@ -82,17 +81,17 @@ app_ui = ui.page_sidebar(
         ),
         ui.card(
             ui.card_header(
-                "Tip percentages",
+                "Average tip by category",
                 ui.popover(
                     ICONS["ellipsis"],
                     ui.input_radio_buttons(
                         "tip_perc_y",
-                        "Split by:",
+                        "Group by:",
                         ["sex", "smoker", "day", "time"],
                         selected="day",
                         inline=True,
                     ),
-                    title="Add a color variable",
+                    title="Choose grouping",
                 ),
                 class_="d-flex justify-content-between align-items-center",
             ),
@@ -141,52 +140,29 @@ def server(input, output, session):
     @render_plotly
     def scatterplot():
         color = input.scatter_color()
-        is_shinylive = "pyodide" in sys.modules
         return px.scatter(
             tips_data(),
             x="total_bill",
             y="tip",
             color=None if color == "none" else color,
-            trendline=None if is_shinylive else "lowess",
+            title="Total Bill vs Tip",
+            labels={"total_bill": "Total Bill", "tip": "Tip"},
         )
 
     @render_plotly
     def tip_perc():
-        is_shinylive = "pyodide" in sys.modules
-
         dat = tips_data()
-        dat["percent"] = dat.tip / dat.total_bill
         yvar = input.tip_perc_y()
+        dat_grouped = dat.groupby(yvar, as_index=False)["tip"].mean()
 
-        if is_shinylive:
-            return px.box(
-                dat,
-                x=yvar,
-                y="percent",
-                color=yvar,
-                title=f"Tip percentage by {yvar}",
-            )
-        else:
-            from ridgeplot import ridgeplot
-
-            uvals = dat[yvar].unique()
-            samples = [[dat.percent[dat[yvar] == val]] for val in uvals]
-
-            plt = ridgeplot(
-                samples=samples,
-                labels=uvals,
-                bandwidth=0.01,
-                colorscale="viridis",
-                colormode="row-index",
-            )
-
-            plt.update_layout(
-                legend=dict(
-                    orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5
-                )
-            )
-
-            return plt
+        return px.bar(
+            dat_grouped,
+            x=yvar,
+            y="tip",
+            title=f"Average Tip by {yvar.capitalize()}",
+            labels={"tip": "Average Tip"},
+            color=yvar,
+        )
 
     @reactive.effect
     @reactive.event(input.reset)
@@ -197,3 +173,4 @@ def server(input, output, session):
 
 
 app = App(app_ui, server)
+
