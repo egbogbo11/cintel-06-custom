@@ -1,5 +1,6 @@
 import faicons as fa
 import plotly.express as px
+import sys
 
 # Load data and compute static values
 from shared import app_dir, tips
@@ -8,7 +9,6 @@ from shinywidgets import output_widget, render_plotly
 
 bill_rng = (min(tips.total_bill), max(tips.total_bill))
 
-
 ICONS = {
     "user": fa.icon_svg("user", "regular"),
     "wallet": fa.icon_svg("wallet"),
@@ -16,7 +16,6 @@ ICONS = {
     "ellipsis": fa.icon_svg("ellipsis"),
 }
 
-# Add page title and sidebar
 app_ui = ui.page_sidebar(
     ui.sidebar(
         ui.input_slider(
@@ -32,6 +31,13 @@ app_ui = ui.page_sidebar(
             "Food service",
             ["Lunch", "Dinner"],
             selected=["Lunch", "Dinner"],
+            inline=True,
+        ),
+        ui.input_checkbox_group(
+            "sex",
+            "Gender",
+            ["Male", "Female"],
+            selected=["Male", "Female"],
             inline=True,
         ),
         ui.input_action_button("reset", "Reset filter"),
@@ -107,7 +113,8 @@ def server(input, output, session):
         bill = input.total_bill()
         idx1 = tips.total_bill.between(bill[0], bill[1])
         idx2 = tips.time.isin(input.time())
-        return tips[idx1 & idx2]
+        idx3 = tips.sex.isin(input.sex())
+        return tips[idx1 & idx2 & idx3]
 
     @render.ui
     def total_tippers():
@@ -134,12 +141,13 @@ def server(input, output, session):
     @render_plotly
     def scatterplot():
         color = input.scatter_color()
+        is_shinylive = "pyodide" in sys.modules
         return px.scatter(
             tips_data(),
             x="total_bill",
             y="tip",
             color=None if color == "none" else color,
-            trendline="lowess",
+            trendline=None if is_shinylive else "lowess",
         )
 
     @render_plotly
@@ -174,6 +182,7 @@ def server(input, output, session):
     def _():
         ui.update_slider("total_bill", value=bill_rng)
         ui.update_checkbox_group("time", selected=["Lunch", "Dinner"])
+        ui.update_checkbox_group("sex", selected=["Male", "Female"])
 
 
 app = App(app_ui, server)
